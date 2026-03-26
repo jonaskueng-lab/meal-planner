@@ -525,25 +525,15 @@ NOTIZEN ALENA: ${state.alena.notes||'keine'}
 
 VORRAT (nicht einkaufen): Jasminreis, Basmatireis, Risottoreis, Wildreis, Couscous, Hirse, Polenta, Spaghetti, Hörnli, Miso, Sojasoße, Mirin, Reisessig, Sherryessig, Zitronenöl, Olivenöl, Erdnussöl, Sonnenblumenöl, Ingwer, Kurkuma, Kreuzkümmel, Koriander, Curry, Paprika, Rosmarin, Sternanis, Sumak, Pfeffer, Bouillon, Honig, Ahornsirup, Kokosmilch, Mehl, Zucker.
 
-WICHTIG: Antworte NUR mit einem JSON-Objekt ohne jeglichen Text davor oder danach:
-{
-  "wochenplan": [
-    {"tag":"Montag","tag_short":"Mo","tag_type":"Schule","fruehstueck":"...","mittag":"...","abend":"... (Alena kocht)"}
-  ],
-  "einkaufsliste": [
-    {"kategorie":"Fleisch & Geflügel","items":[{"name":"Pouletbrust","menge":"600g"}]}
-  ],
-  "meal_prep": [
-    {"zeit":"10:00","dauer":"30 Min","aufgabe":"..."}
-  ]
-}
+WICHTIG: Antworte NUR mit validem JSON, kein Text davor/danach. Mahlzeiten kurz (max 8 Wörter).
+{"wochenplan":[{"tag":"Montag","tag_short":"Mo","tag_type":"","fruehstueck":"...","mittag":"...","abend":"..."}],"einkaufsliste":[{"kategorie":"Fleisch & Geflügel","items":[{"name":"Pouletbrust","menge":"600g"}]}],"meal_prep":[{"zeit":"10:00","dauer":"30 Min","aufgabe":"..."}]}
 Kategorien: "Fleisch & Geflügel", "Gemüse & Früchte", "Milch & Eier", "Trockenware & Sonstiges"`;
 
   try {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
     const text=(data.content||[]).map(b=>b.text||'').join('');
