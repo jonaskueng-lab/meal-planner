@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wochenplaner · Jonas & Lea</title>
+<title>Wochenplaner · </title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -310,7 +310,7 @@
   <!-- User switcher -->
   <div class="user-switcher">
     <button class="user-btn active" id="btnJonas" onclick="switchUser('jonas')">🧑 Jonas</button>
-    <button class="user-btn" id="btnPartner" onclick="switchUser('partner')">👩 Freundin</button>
+    <button class="user-btn" id="btnPartner" onclick="switchUser('partner')">👩 Alena</button>
   </div>
 
   <!-- JONAS FORM -->
@@ -375,7 +375,7 @@
 <div class="modal-bg" id="settingsModal" style="display:none">
   <div class="modal">
     <h3>Einstellungen</h3>
-    <p>Damit Jonas & Freundin dieselben Daten sehen, braucht ihr einen kostenlosen <strong>JSONBin.io</strong> Account. Einmal einrichten, dann läuft's automatisch.</p>
+    <p>Damit Jonas & Alena dieselben Daten sehen, braucht ihr einen kostenlosen <strong>JSONBin.io</strong> Account. Einmal einrichten, dann läuft's automatisch.</p>
     <div class="field">
       <label>Anthropic API Key</label>
       <input type="text" id="cfgApiKey" placeholder="sk-ant-..." />
@@ -689,7 +689,12 @@ Format: direkt, strukturiert, keine langen Einleitungen.`;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': cfg.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
