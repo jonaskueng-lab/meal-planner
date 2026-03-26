@@ -646,7 +646,15 @@ function renderResult(data) {
 function toggleCheck(id,li){checks[id]=!checks[id];li.classList.toggle('done',checks[id]);saveLocal();setTimeout(()=>syncToBin(),500);}
 function clearChecks(prefix){Object.keys(checks).forEach(k=>{if(k.startsWith(prefix))delete checks[k];});const r=localStorage.getItem('mp_result');if(r)renderResult(JSON.parse(r));saveLocal();}
 
-document.addEventListener('DOMContentLoaded',()=>{init();checkSync();});
+document.addEventListener('DOMContentLoaded',()=>{
+  init();
+  checkSync();
+  // Live-Polling alle 20 Sekunden
+  setInterval(()=>{
+    const cfg=getConfig();
+    if(cfg.binKey&&cfg.binId) loadFromBin();
+  }, 20000);
+});
 </script>
 </body>
 </html>
