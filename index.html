@@ -519,7 +519,15 @@ async function loadFromBin(){
     const res=await fetch(`https://api.jsonbin.io/v3/b/${cfg.binId}/latest`,{headers:{'X-Master-Key':cfg.binKey}});
     const d=await res.json();
     if(d.record){
-      if(d.record.state){state={...state,...d.record.state};applyState();}
+      if(d.record.state){
+        // Merge state maar behoudt lokale ready status niet — neem altijd remote
+        state = {...state, ...d.record.state};
+        // Zorg dat ready fields correct zijn
+        if(d.record.state.jonas) state.jonas = {...state.jonas, ...d.record.state.jonas};
+        if(d.record.state.alena) state.alena = {...state.alena, ...d.record.state.alena};
+        applyState();
+        updateReadyStatus();
+      }
       if(d.record.checks){checks=d.record.checks;}
       if(d.record.result){
         localStorage.setItem('mp_result', JSON.stringify(d.record.result));
