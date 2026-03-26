@@ -356,8 +356,9 @@ let currentUser = 'jonas';
 function markUserReady(user) {
   state[user].ready = true;
   state[user].readyTime = new Date().toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'});
-  debounceSave();
+  saveLocal();
   updateReadyStatus();
+  syncToBin(); // Sofort synchronisieren, kein debounce
 }
 
 function updateReadyStatus() {
