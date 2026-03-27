@@ -969,7 +969,21 @@ async function callAPI(prompt, maxTokens=3000) {
   const data=await res.json();
   const text=(data.content||[]).map(b=>b.text||'').join('');
   if(!res.ok||!text) throw new Error(data?.error?.message||'Keine Antwort');
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
+  // Robust JSON extraction: find first { and last }
+  const cleaned = text.replace(/```json|```/g,'').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if(start === -1 || end === -1) throw new Error('Kein JSON gefunden');
+  const jsonStr = cleaned.slice(start, end+1);
+  try {
+    return JSON.parse(jsonStr);
+  } catch(e) {
+    // Try to fix common issues: trailing commas, unquoted keys
+    const fixed = jsonStr
+      .replace(/,\s*([}\]])/g, '$1')  // trailing commas
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3'); // unquoted keys
+    return JSON.parse(fixed);
+  }
 }
 
 async function generate() {
@@ -1003,11 +1017,14 @@ Vorrat (nicht kaufen): Reis, Couscous, Hirse, Polenta, Pasta, Miso, Sojasoße, M
 
 SCHRITT 1: Erstelle Wochenplan + Einkaufsliste. Antworte NUR mit JSON:
 {"wochenplan":[{"tag":"Samstag","tag_short":"Sa","tag_type":"","fruehstueck":"...","mittag":"...","abend":"..."}],"einkaufsliste":[{"kategorie":"Früchte & Gemüse","items":[{"name":"Spinat","menge":"200g","preis":"CHF 2.50"}]}],"total_budget":"CHF XX.XX","meal_prep":[{"zeit":"10:00","dauer":"30 Min","aufgabe":"..."}]}
-Regeln:
-- Woche: Sa So Mo Di Mi Do Fr
+Strikte Regeln:
+- NUR JSON ausgeben, absolut kein Text davor oder danach
+- Alle JSON-Keys in doppelten Anführungszeichen
+- Woche: Sa So Mo Di Mi Do Fr (7 Einträge)
 - Migros-Kategorien: "Früchte & Gemüse","Fleisch & Geflügel","Fisch & Meeresfrüchte","Kühlprodukte & Milch","Brot & Backwaren","Trockenware & Sonstiges"
 - Realistische Migros CHF-Preise 2025
-- Mahlzeiten max 7 Wörter`;
+- Mahlzeiten max 7 Wörter
+- Keine trailing commas`;
 
   const prompt2 = (wochenplan) => `${context}
 
@@ -1016,10 +1033,13 @@ ${wochenplan.map(d=>`${d.tag}: Abend = ${d.abend||d.abend_jonas||'–'}`).join('
 
 SCHRITT 2: Erstelle Rezepte nur für die Abendessen. Antworte NUR mit JSON:
 {"rezepte":[{"name":"Rezeptname","tag":"Montag","mahlzeit":"Abend","portionen_jonas":"420g / 680 kcal","portionen_alena":"300g / 490 kcal","kalorien":"ca. 580 kcal/Pers","protein":"ca. 48g/Pers","zutaten":[{"name":"Pouletbrust","menge":"600g"}],"zubereitung":["Schritt 1","Schritt 2","Schritt 3"]}]}
-Regeln:
+Strikte Regeln:
+- NUR JSON ausgeben, absolut kein Text davor oder danach
+- Alle JSON-Keys in doppelten Anführungszeichen
 - 3–4 Schritte pro Rezept, konkret und kurz
 - Mengen immer für 2 Personen
-- Portionen Jonas vs Alena getrennt angeben`;
+- Portionen Jonas vs Alena getrennt angeben
+- Keine trailing commas`;
 
   try {
     // Call 1: Plan + Einkaufsliste
