@@ -959,11 +959,23 @@ function clearChecks(prefix) {
 }
 
 /* ── GENERATE ── */
+async function callAPI(prompt, maxTokens=3000) {
+  const cfg=getConfig();
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,messages:[{role:'user',content:prompt}]})
+  });
+  const data=await res.json();
+  const text=(data.content||[]).map(b=>b.text||'').join('');
+  if(!res.ok||!text) throw new Error(data?.error?.message||'Keine Antwort');
+  return JSON.parse(text.replace(/```json|```/g,'').trim());
+}
+
 async function generate() {
   const cfg=getConfig(); if(!cfg.apiKey){ openSettings(); return; }
   const btn=document.getElementById('btnGen'), errBox=document.getElementById('errorBox');
-  btn.disabled=true; btn.innerHTML='<span class="dots"><span>·</span><span>·</span><span>·</span></span>';
-  errBox.style.display='none';
+  btn.disabled=true; errBox.style.display='none';
 
   const kw=getKW(), cv=state.shared.cuisine;
   const cuisineDesc = cv<25?'Sehr einfach & saisonal, Schweizer/europäische Küche':
@@ -975,45 +987,50 @@ async function generate() {
   const alenaTrain=state.users.alena.trainingDays.map(d=>DAYS_FULL[DAYS_SHORT.indexOf(d)]).join(', ')||'keine';
   const occLines=Object.entries(state.shared.dayOccasions).map(([d,o])=>`${DAYS_FULL[DAYS_SHORT.indexOf(d)]}: ${o}`).join(', ')||'keine';
 
-  const prompt=`Ernährungs- und Meal-Prep-Assistent für Jonas & Alena in der Schweiz. Erstelle Wochenplan KW ${kw}.
+  const context=`Jonas & Alena, Schweiz, KW ${kw}.
+Jonas: 73kg, Ziel ${state.users.jonas.goal}, ~2900 kcal, ~170g Protein. Isst alles inkl. Fisch.
+Alena: 63kg, Ziel ${state.users.alena.goal}, ~2100 kcal, ~115g Protein. KEIN FISCH (nie).
+Wenn Jonas Fisch → Alena Alternative → nutze "mittag_jonas"/"mittag_alena" bzw. "abend_jonas"/"abend_alena".
+Mo & Mi Abend: Alena kocht alleine, max 30 Min.
+Trainingstage Jonas: ${jonasTrain} | Alena: ${alenaTrain}
+Meal Prep: Sonntag für Mo–Mi, Mittwoch für Do–Fr.
+Anlässe: ${occLines}
+Küchenstil: ${cuisineDesc}
+Notizen Jonas: ${state.users.jonas.notes||'keine'} | Alena: ${state.users.alena.notes||'keine'}
+Vorrat (nicht kaufen): Reis, Couscous, Hirse, Polenta, Pasta, Miso, Sojasoße, Mirin, Reisessig, alle Öle, alle Grundgewürze, Bouillon, Honig, Kokosmilch, Mehl, Zucker.`;
 
-PROFILE:
-- Jonas: 170cm, 73kg, Ziel ${state.users.jonas.goal}, ~2900 kcal/Tag, ~170g Protein. Isst alles inkl. Fisch.
-- Alena: 163cm, 63kg, Ziel ${state.users.alena.goal}, ~2100 kcal/Tag, ~115g Protein. KEIN FISCH (absolut nie).
-- Grundsätzlich gemeinsame Mahlzeiten. Wenn Jonas Fisch isst → Alena bekommt fischfreie Alternative → nutze dann "mittag_jonas"/"mittag_alena" oder "abend_jonas"/"abend_alena" statt "mittag"/"abend".
+  const prompt1=`${context}
 
-WOCHENSTRUKTUR (Woche beginnt SAMSTAG):
-- Mo & Mi Abend: Jonas hat Schule 17:30–20:45. Alena kocht alleine → max 30 Min.
-- Trainingstage Jonas: ${jonasTrain}
-- Trainingstage Alena: ${alenaTrain}
-- Meal Prep Sonntag: Mittag Mo–Mi vorbereiten.
-- Meal Prep Mittwoch: Mittag Do–Fr vorbereiten.
-- Anlässe: ${occLines}
+SCHRITT 1: Erstelle Wochenplan + Einkaufsliste. Antworte NUR mit JSON:
+{"wochenplan":[{"tag":"Samstag","tag_short":"Sa","tag_type":"","fruehstueck":"...","mittag":"...","abend":"..."}],"einkaufsliste":[{"kategorie":"Früchte & Gemüse","items":[{"name":"Spinat","menge":"200g","preis":"CHF 2.50"}]}],"total_budget":"CHF XX.XX","meal_prep":[{"zeit":"10:00","dauer":"30 Min","aufgabe":"..."}]}
+Regeln:
+- Woche: Sa So Mo Di Mi Do Fr
+- Migros-Kategorien: "Früchte & Gemüse","Fleisch & Geflügel","Fisch & Meeresfrüchte","Kühlprodukte & Milch","Brot & Backwaren","Trockenware & Sonstiges"
+- Realistische Migros CHF-Preise 2025
+- Mahlzeiten max 7 Wörter`;
 
-KÜCHENSTIL: ${cuisineDesc}
-Schweizer Supermärkte. Saisonalität beachten.
-NOTIZEN JONAS: ${state.users.jonas.notes||'keine'}
-NOTIZEN ALENA: ${state.users.alena.notes||'keine'}
+  const prompt2 = (wochenplan) => `${context}
 
-VORRAT (nicht einkaufen): Jasminreis, Basmatireis, Risottoreis, Wildreis, Couscous, Hirse, Polenta, Spaghetti, Hörnli, Miso, Sojasoße, Mirin, Reisessig, Sherryessig, Zitronenöl, Olivenöl, Erdnussöl, Sonnenblumenöl, Ingwer, Kurkuma, Kreuzkümmel, Koriander, Curry, Paprika, Rosmarin, Sternanis, Sumak, Pfeffer, Bouillon, Honig, Ahornsirup, Kokosmilch, Mehl, Zucker.
+Wochenplan diese Woche:
+${wochenplan.map(d=>`${d.tag}: Abend = ${d.abend||d.abend_jonas||'–'}`).join(', ')}
 
-WICHTIG: Antworte NUR mit validem JSON ohne Text davor/danach.
-{"wochenplan":[{"tag":"Samstag","tag_short":"Sa","tag_type":"","fruehstueck":"...","mittag":"...","abend":"..."}],"einkaufsliste":[{"kategorie":"Früchte & Gemüse","items":[{"name":"Spinat","menge":"200g","preis":"CHF 2.50"}]}],"total_budget":"CHF XX.XX","meal_prep":[{"zeit":"10:00","dauer":"30 Min","aufgabe":"..."}],"rezepte":[{"name":"Rezeptname","tag":"Montag","mahlzeit":"Abend","portionen_jonas":"400g / 650 kcal","portionen_alena":"300g / 480 kcal","kalorien":"ca. 560 kcal/Pers","protein":"ca. 45g/Pers","zutaten":[{"name":"Pouletbrust","menge":"600g"},{"name":"Knoblauch","menge":"2 Zehen"}],"zubereitung":["Poulet würzen und 8 Min bei 200°C braten","Gemüse dazugeben und weitere 5 Min garen"]}]}
-- Wochenplan: Sa So Mo Di Mi Do Fr (7 Tage)
-- Einkauf: Migros-Kategorien: "Früchte & Gemüse", "Fleisch & Geflügel", "Fisch & Meeresfrüchte", "Kühlprodukte & Milch", "Brot & Backwaren", "Trockenware & Sonstiges"
-- Preise: realistische Migros CHF-Preise 2025
-- Rezepte: nur Abendessen (5–7 Rezepte), kurze Zubereitungsschritte (3–5 Schritte), Portionsmengen getrennt für Jonas und Alena`;
+SCHRITT 2: Erstelle Rezepte nur für die Abendessen. Antworte NUR mit JSON:
+{"rezepte":[{"name":"Rezeptname","tag":"Montag","mahlzeit":"Abend","portionen_jonas":"420g / 680 kcal","portionen_alena":"300g / 490 kcal","kalorien":"ca. 580 kcal/Pers","protein":"ca. 48g/Pers","zutaten":[{"name":"Pouletbrust","menge":"600g"}],"zubereitung":["Schritt 1","Schritt 2","Schritt 3"]}]}
+Regeln:
+- 3–4 Schritte pro Rezept, konkret und kurz
+- Mengen immer für 2 Personen
+- Portionen Jonas vs Alena getrennt angeben`;
 
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
-    });
-    const data=await res.json();
-    const text=(data.content||[]).map(b=>b.text||'').join('');
-    if(!res.ok||!text) throw new Error(data?.error?.message||'Keine Antwort');
-    const parsed=JSON.parse(text.replace(/```json|```/g,'').trim());
+    // Call 1: Plan + Einkaufsliste
+    btn.innerHTML='<span class="dots"><span>·</span><span>·</span><span>·</span></span> 1/2';
+    const plan = await callAPI(prompt1, 3000);
+
+    // Call 2: Rezepte
+    btn.innerHTML='<span class="dots"><span>·</span><span>·</span><span>·</span></span> 2/2';
+    const rezepte = await callAPI(prompt2(plan.wochenplan||[]), 2500);
+
+    const parsed = {...plan, rezepte: rezepte.rezepte||[]};
 
     state.shared.result=parsed; state.shared.checks={};
     state.users.jonas.ready=false; state.users.jonas.readyTime=null;
